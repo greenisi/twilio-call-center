@@ -55,12 +55,11 @@ export function useTwilioDevice() {
         deviceRef.current.destroy();
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const device = new Device(token, {
         logLevel: "warn",
-        codecPreferences: ["opus", "pcmu"] as unknown as Parameters<
-          typeof Device
-        >[1]["codecPreferences"],
-      });
+        codecPreferences: ["opus", "pcmu"] as any,
+      } as any);
 
       device.on("registered", () => setDeviceState("registered"));
       device.on("unregistered", () => setDeviceState("offline"));
