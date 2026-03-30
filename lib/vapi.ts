@@ -113,31 +113,16 @@ interface VapiAssistant {
   name: string;
 }
 
-let _inboundId: string | null = null;
-let _outboundId: string | null = null;
-
-async function findOrCreateAssistant(
-  config: typeof INBOUND_ASSISTANT_CONFIG
-): Promise<string> {
-  // Look for existing assistant by name
-  const list = await vapiRequest<VapiAssistant[]>("/assistant");
-  const existing = list.find((a) => a.name === config.name);
-  if (existing) return existing.id;
-
-  // Create if not found
-  const created = await vapiRequest<VapiAssistant>("/assistant", "POST", config);
-  console.log(`[Vapi] Created assistant "${config.name}" → ${created.id}`);
-  return created.id;
-}
+// Pre-created assistant IDs (created via Vapi API on 2026-03-30)
+const INBOUND_ASSISTANT_ID  = "9fd22eb4-7e32-4b60-b346-747c628ed7a8";
+const OUTBOUND_ASSISTANT_ID = "434f9178-2994-41ef-90d9-b2507b5f2d30";
 
 export async function getInboundAssistantId(): Promise<string> {
-  if (!_inboundId) _inboundId = await findOrCreateAssistant(INBOUND_ASSISTANT_CONFIG);
-  return _inboundId;
+  return INBOUND_ASSISTANT_ID;
 }
 
 export async function getOutboundAssistantId(): Promise<string> {
-  if (!_outboundId) _outboundId = await findOrCreateAssistant(OUTBOUND_ASSISTANT_CONFIG);
-  return _outboundId;
+  return OUTBOUND_ASSISTANT_ID;
 }
 
 // ─── Create Outbound Call ─────────────────────────────────────────────────────
