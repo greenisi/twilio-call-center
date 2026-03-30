@@ -3,28 +3,25 @@ import twilio from "twilio";
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
-// TwiML Voice URL — called by Twilio when a browser client makes a call
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const to = formData.get("To") as string;
-  const from = formData.get("From") as string;
+  const direction = formData.get("Direction") as string; // "inbound" or "outbound-api"
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const wsUrl = appUrl.replace(/^https?/, "wss");
 
   const twiml = new VoiceResponse();
 
-  if (to) {
-    const dial = twiml.dial({
-      callerId: process.env.TWILIO_PHONE_NUMBER!,
-    });
-
-    // If To starts with "client:", connect to another browser client
-    if (to.startsWith("client:")) {
-      dial.client(to.replace("client:", ""));
-    } else {
-      // Dial a phone number
-      dial.number(to);
-    }
+  if (to?.startsWith("client:")) {
+    const dial = twiml.dial({ callerId: process.env.TWILIO_PHONE_NUMBER! });
+    dial.client(to.replace("client:", ""));
   } else {
-    twiml.say("Thank you for calling. No destination specified.");
+    const isInbound = direction === "inbound";
+    const callType = isInbound ? "inbound" : "outbound";
+
+    const connect = twiml.connect();
+    connect.stream({ url: `${wsUrl}/media-stream?callType=${callType}` });
   }
 
   return new NextResponse(twiml.toString(), {
