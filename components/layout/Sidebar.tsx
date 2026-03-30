@@ -10,6 +10,8 @@ import {
   Users,
   Radio,
   Settings,
+  UserCheck,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +20,8 @@ const navItems = [
   { href: "/softphone", label: "Softphone", icon: PhoneCall },
   { href: "/calls", label: "Call Logs", icon: Phone },
   { href: "/contacts", label: "Contacts", icon: Users },
+  { href: "/leads", label: "Leads", icon: UserCheck },
+  { href: "/campaigns", label: "Campaigns", icon: BarChart2 },
   { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

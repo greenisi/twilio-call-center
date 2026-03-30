@@ -71,8 +71,11 @@ Be warm and respectful of their time. Never be pushy. If not interested, thank t
 // Voice: Vapi native "Chloe" — no external API key required
 
 const VOICE_CONFIG = {
-  provider: "vapi",
-  voiceId: "Chloe",
+  provider: "11labs",
+  voiceId: "cgSgspJ2msm6clMCkdW9", // Jessica — most realistic female voice
+  model: "eleven_turbo_v2_5",
+  stability: 0.5,
+  similarityBoost: 0.75,
 };
 
 const MODEL_CONFIG = (systemPrompt: string) => ({

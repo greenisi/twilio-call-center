@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Phone } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { StatsCards } from "@/components/dashboard/StatsCards";
 import { RecentCalls } from "@/components/dashboard/RecentCalls";
@@ -8,6 +10,34 @@ import { useCallStats, useCalls } from "@/hooks/useCalls";
 export default function DashboardPage() {
   const { stats, loading: statsLoading } = useCallStats();
   const { calls, loading: callsLoading } = useCalls();
+  const [dialNumber, setDialNumber] = useState("");
+  const [dialing, setDialing] = useState(false);
+  const [dialStatus, setDialStatus] = useState("");
+
+  const handleQuickDial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dialNumber.trim()) return;
+    setDialing(true);
+    setDialStatus("");
+    try {
+      const res = await fetch("/api/calls/outbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: dialNumber.trim() }),
+      });
+      if (res.ok) {
+        setDialStatus("Calling...");
+        setDialNumber("");
+        setTimeout(() => setDialStatus(""), 3000);
+      } else {
+        setDialStatus("Failed to place call");
+      }
+    } catch {
+      setDialStatus("Error placing call");
+    } finally {
+      setDialing(false);
+    }
+  };
 
   return (
     <div className="animate-fade-in">
@@ -25,6 +55,31 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Quick Dial */}
+            <div className="bg-navy-800 rounded-xl border border-navy-700 p-5">
+              <h2 className="text-white font-semibold mb-3">Quick AI Dial</h2>
+              <form onSubmit={handleQuickDial} className="space-y-2">
+                <input
+                  type="tel"
+                  value={dialNumber}
+                  onChange={(e) => setDialNumber(e.target.value)}
+                  placeholder="+1 (912) 555-0000"
+                  className="w-full bg-navy-900 border border-navy-600 rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-accent transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={dialing || !dialNumber.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-white text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Phone className="w-4 h-4" />
+                  {dialing ? "Calling..." : "Call with AI (Sarah)"}
+                </button>
+                {dialStatus && (
+                  <p className="text-emerald-400 text-xs text-center">{dialStatus}</p>
+                )}
+              </form>
+            </div>
+
             {/* Quick Actions */}
             <div className="bg-navy-800 rounded-xl border border-navy-700 p-5">
               <h2 className="text-white font-semibold mb-4">Quick Actions</h2>
