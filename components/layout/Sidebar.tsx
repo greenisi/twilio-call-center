@@ -12,6 +12,7 @@ import {
   Settings,
   UserCheck,
   BarChart2,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/leads", label: "Leads", icon: UserCheck },
   { href: "/campaigns", label: "Campaigns", icon: BarChart2 },
+  { href: "/sms", label: "SMS Demo", icon: MessageSquare },
   { href: "/monitor", label: "Live Monitor", icon: Radio },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
