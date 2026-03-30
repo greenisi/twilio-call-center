@@ -11,6 +11,9 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, port });
 const handle = app.getRequestHandler();
 
+// Start warming Gemini sessions immediately — before Next.js is ready
+initPool();
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url!, true);
@@ -28,6 +31,5 @@ app.prepare().then(() => {
 
   server.listen(port, () => {
     console.log(`> Ready on port ${port}`);
-    initPool();
   });
 });

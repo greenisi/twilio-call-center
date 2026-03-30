@@ -32,6 +32,8 @@ export async function handleTwilioMediaStream(twilioWs: WebSocket, callType = "i
   let streamSid: string | null = null;
   let callSid: string | null = null;
   let isModelSpeaking = false;
+  // Inbound: suppress all AI audio until the caller speaks first
+  let callerHasSpoken = callType !== "inbound";
   const transcript: { role: string; text: string }[] = [];
 
   // Buffer Twilio messages that arrive before Gemini is ready
@@ -46,6 +48,13 @@ export async function handleTwilioMediaStream(twilioWs: WebSocket, callType = "i
         callSid = msg.start.callSid;
         console.log(`[Bridge] Stream started sid=${streamSid}`);
       } else if (msg.event === "media" && session) {
+        // First caller audio: unlock AI speech and clear any queued bot audio
+        if (!callerHasSpoken) {
+          callerHasSpoken = true;
+          if (streamSid && twilioWs.readyState === WebSocket.OPEN) {
+            twilioWs.send(JSON.stringify({ event: "clear", streamSid }));
+          }
+        }
         // If model is currently speaking and user starts talking, clear buffer immediately
         if (isModelSpeaking && streamSid && twilioWs.readyState === WebSocket.OPEN) {
           isModelSpeaking = false;
@@ -94,8 +103,8 @@ export async function handleTwilioMediaStream(twilioWs: WebSocket, callType = "i
       return;
     }
 
-    // Send audio chunks to Twilio
-    if (msg.serverContent?.modelTurn?.parts) {
+    // Send audio chunks to Twilio (inbound: only after caller has spoken)
+    if (callerHasSpoken && msg.serverContent?.modelTurn?.parts) {
       for (const part of msg.serverContent.modelTurn.parts) {
         if (part.inlineData?.data) {
           try {
