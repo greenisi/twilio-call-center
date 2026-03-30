@@ -3,13 +3,11 @@ import twilio from "twilio";
 
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
+// This webhook is used by the Twilio softphone (browser client → client: routing).
+// Inbound AI calls are handled directly by Vapi (after running /api/vapi/setup).
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const to = formData.get("To") as string;
-  const direction = formData.get("Direction") as string; // "inbound" or "outbound-api"
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const wsUrl = appUrl.replace(/^https?/, "wss");
 
   const twiml = new VoiceResponse();
 
@@ -17,11 +15,8 @@ export async function POST(req: NextRequest) {
     const dial = twiml.dial({ callerId: process.env.TWILIO_PHONE_NUMBER! });
     dial.client(to.replace("client:", ""));
   } else {
-    const isInbound = direction === "inbound";
-    const callType = isInbound ? "inbound" : "outbound";
-
-    const connect = twiml.connect();
-    connect.stream({ url: `${wsUrl}/media-stream?callType=${callType}` });
+    // Fallback: say a message if called directly outside Vapi flow
+    twiml.say({ voice: "alice" }, "Thank you for calling Cash Annuity Solutions. Please hold.");
   }
 
   return new NextResponse(twiml.toString(), {
