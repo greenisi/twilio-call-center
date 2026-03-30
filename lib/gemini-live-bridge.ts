@@ -1,9 +1,8 @@
 import { WebSocket } from "ws";
-import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai";
+import { GoogleGenAI, type LiveServerMessage, type Session } from "@google/genai";
 import { mulaw } from "alawmulaw";
 import { getSupabaseAdmin } from "./supabase-server";
-
-const GEMINI_MODEL = "gemini-3.1-flash-live-preview";
+import { acquireSession } from "./gemini-session-pool";
 
 // Twilio mulaw 8kHz → Gemini PCM16 16kHz (base64)
 function twilioToGemini(mulawBuf: Buffer): string {
@@ -28,58 +27,7 @@ function geminiToTwilio(base64Audio: string): Buffer {
   return Buffer.from(mulaw.encode(pcm8k));
 }
 
-const INBOUND_PROMPT = `You are Sarah, a professional sales agent for Cash Annuity Solutions — a company that helps people turn their structured settlement or annuity payments into a lump sum of cash right now.
-
-The caller reached out to us. Your goal: qualify them and book an appointment with a senior advisor.
-
-Key facts about our service:
-- We help people with structured settlements, lottery annuities, workers' comp, and personal injury settlements
-- Get cash NOW instead of waiting years for payments
-- 0 hidden fees — 100% clear cash offer upfront
-- Court-approved, legally protected process
-- Average funding within 45 days
-- Sell all or just part of your payments — flexible
-
-Conversation flow:
-1. Wait for the caller to speak first. Do NOT say anything until they do.
-2. Once they speak, warmly respond and find out what type of settlement or annuity they have
-3. Ask what they'd use the money for (qualify the need — debt, medical, home, etc.)
-4. Briefly explain the benefits and process
-5. Offer a free, no-obligation cash offer from a senior advisor
-6. Collect their name and best callback number to schedule
-
-Be conversational and empathetic. Keep responses brief — this is a phone call. If they're not interested, thank them and end warmly.`;
-
-const OUTBOUND_PROMPT = `You are Sarah, a professional outbound sales agent for Cash Annuity Solutions — a company that helps people turn their structured settlement or annuity payments into a lump sum of cash right now.
-
-You are making an outbound call to someone who may have a structured settlement or annuity. Your goal: see if they're interested and qualify them for a free cash offer.
-
-Key facts:
-- We help people with structured settlements, lottery annuities, workers' comp, and personal injury settlements get their money NOW
-- 0 hidden fees — 100% clear offer upfront
-- Court-approved, legally protected
-- Average funding within 45 days
-- Sell all or part of payments
-
-Conversation flow:
-1. Introduce yourself: "Hi, this is Sarah from Cash Annuity Solutions. I'm reaching out because we help people who have structured settlement or annuity payments get access to their cash sooner. Is that something that might be of interest to you?"
-2. If interested — ask what type of settlement they have and what they'd use the funds for
-3. Explain the quick, no-hassle process
-4. Offer to connect them with a senior advisor for a free cash offer
-5. Collect their name and best time to call back
-
-Be warm and respectful of their time. Never be pushy. If not interested, thank them and end the call.`;
-
 export async function handleTwilioMediaStream(twilioWs: WebSocket, callType = "inbound") {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    console.error("[Bridge] GOOGLE_API_KEY not set");
-    twilioWs.close();
-    return;
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  const systemPrompt = callType === "outbound" ? OUTBOUND_PROMPT : INBOUND_PROMPT;
   let session: Session | null = null;
   let streamSid: string | null = null;
   let callSid: string | null = null;
@@ -179,40 +127,22 @@ export async function handleTwilioMediaStream(twilioWs: WebSocket, callType = "i
   }
 
   try {
-    // Connect to Gemini
-    session = await ai.live.connect({
-      model: GEMINI_MODEL,
-      callbacks: {
-        onopen: () => console.log("[Bridge] Gemini connected"),
-        onmessage: onGeminiMessage,
-        onerror: (e) => console.error("[Bridge] Gemini error:", e),
-        onclose: (e) => console.log("[Bridge] Gemini closed:", e.code),
-      },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
-        },
-        realtimeInputConfig: {
-          automaticActivityDetection: {
-            prefixPaddingMs: 20,
-            silenceDurationMs: 200,
-          },
-        },
-      },
-    });
+    // Grab a pre-warmed session from the pool (near-instant)
+    const acquired = await acquireSession(callType);
+    session = acquired.session;
+    acquired.setMessageHandler(onGeminiMessage);
+    acquired.setCloseHandler((e) => console.log("[Bridge] Gemini closed:", e.code));
 
     // Gemini is ready — drain buffered messages
     geminiReady = true;
-    console.log(`[Bridge] Draining ${messageQueue.length} buffered messages`);
+    console.log(`[Bridge] Session acquired, draining ${messageQueue.length} buffered messages`);
     for (const raw of messageQueue) {
       processMessage(raw);
     }
     messageQueue.length = 0;
 
   } catch (err) {
-    console.error("[Bridge] Failed to connect to Gemini:", err);
+    console.error("[Bridge] Failed to acquire Gemini session:", err);
     twilioWs.close();
   }
 }
